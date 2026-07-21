@@ -216,7 +216,7 @@ export function App() {
             type="text"
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
-            placeholder="e.g. terra or ImDevinC/*"
+            placeholder="eg. myrepo or MyOrg/*"
             aria-describedby="repo-filter-hint"
           />
           <span id="repo-filter-hint" className="filter-hint">
