@@ -72,7 +72,8 @@ export async function ensureOrganizationAndRepository(
       organizationId,
       repository.id,
       repository.full_name,
-      config.repositorySet.has(repository.full_name.toLowerCase()),
+      config.repositorySet.size === 0 ||
+        config.repositorySet.has(repository.full_name.toLowerCase()),
     ],
   );
 
@@ -155,8 +156,8 @@ export async function applyConfiguration(
   const repositories = [...config.repositorySet];
   const ignoredAuthors = [...config.ignoredAuthorSet];
   await client.query(
-    `UPDATE repositories SET enabled = lower(full_name) = ANY($1::text[]), updated_at = now()`,
-    [repositories],
+    `UPDATE repositories SET enabled = $1 OR lower(full_name) = ANY($2::text[]), updated_at = now()`,
+    [repositories.length === 0, repositories],
   );
   await client.query(
     `UPDATE queue_entries q SET active = false, updated_at = now()

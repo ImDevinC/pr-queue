@@ -5,7 +5,7 @@ import { z } from "zod";
 
 const configSchema = z.object({
   organization: z.string().min(1),
-  repositories: z.array(z.string().regex(/^[^/]+\/[^/]+$/)).min(1),
+  repositories: z.array(z.string().regex(/^[^/]+\/[^/]+$/)).default([]),
   ignored_authors: z.array(z.string().min(1)).default([]),
 });
 
