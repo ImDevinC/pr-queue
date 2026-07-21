@@ -23,9 +23,20 @@ interface QueueResponse {
   entries: QueueEntry[];
 }
 
+function repositoryMatches(filter: string, repository: string): boolean {
+  const trimmed = filter.trim();
+  if (!trimmed) return true;
+  const pattern = trimmed
+    .toLowerCase()
+    .replace(/[.+^${}()|[\]\\]/g, "\\$&")
+    .replace(/\*/g, ".*");
+  return new RegExp(pattern, "i").test(repository);
+}
+
 export function App() {
   const [queue, setQueue] = useState<QueueResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [filter, setFilter] = useState("");
 
   useEffect(() => {
     let cancelled = false;
@@ -58,7 +69,13 @@ export function App() {
     };
   }, []);
 
-  const count = queue?.entries.length ?? 0;
+  const allEntries = queue?.entries ?? [];
+  const filteredEntries = allEntries.filter((entry) =>
+    repositoryMatches(filter, entry.repository),
+  );
+  const totalCount = allEntries.length;
+  const visibleCount = filteredEntries.length;
+  const isFiltering = filter.trim().length > 0;
 
   return (
     <main className="shell">
@@ -72,10 +89,16 @@ export function App() {
         </div>
         <div
           className="queue-count"
-          aria-label={`${count} pull requests waiting`}
+          aria-label={`${visibleCount} pull requests waiting`}
         >
-          <strong>{count}</strong>
-          <span>{count === 1 ? "PR waiting" : "PRs waiting"}</span>
+          <strong>{visibleCount}</strong>
+          <span>
+            {isFiltering
+              ? `of ${totalCount} ${totalCount === 1 ? "PR" : "PRs"}`
+              : visibleCount === 1
+                ? "PR waiting"
+                : "PRs waiting"}
+          </span>
         </div>
       </header>
 
@@ -96,23 +119,48 @@ export function App() {
         <div className="notice">Loading the review queue…</div>
       )}
 
-      {queue && queue.entries.length === 0 && (
+      {queue && (
+        <div className="filter-bar">
+          <label htmlFor="repo-filter" className="filter-label">
+            Filter by repository
+          </label>
+          <input
+            id="repo-filter"
+            className="filter-input"
+            type="text"
+            value={filter}
+            onChange={(e) => setFilter(e.target.value)}
+            placeholder="e.g. terra or ImDevinC/*"
+            aria-describedby="repo-filter-hint"
+          />
+          <span id="repo-filter-hint" className="filter-hint">
+            Use * as wildcard
+          </span>
+        </div>
+      )}
+
+      {queue && filteredEntries.length === 0 && (
         <section className="empty-state">
           <div className="empty-mark">✓</div>
-          <h2>Nothing waiting</h2>
+          <h2>
+            {isFiltering
+              ? "No matching pull requests"
+              : "Nothing waiting"}
+          </h2>
           <p>
-            The queue is clear. This is either excellent process or suspicious
-            timing.
+            {isFiltering
+              ? "Try adjusting your filter pattern."
+              : "The queue is clear. This is either excellent process or suspicious timing."}
           </p>
         </section>
       )}
 
-      {queue && queue.entries.length > 0 && (
+      {queue && filteredEntries.length > 0 && (
         <section
           className="queue"
           aria-label="Pull requests waiting for review"
         >
-          {queue.entries.map((entry) => (
+          {filteredEntries.map((entry) => (
             <PullRequestCard
               entry={entry}
               key={`${entry.repository}-${entry.number}`}
