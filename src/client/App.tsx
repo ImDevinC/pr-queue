@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 type Status = "passing" | "failing" | "pending" | "unknown";
 type ReviewState = "pending" | "approved" | "changes_requested" | "commented";
@@ -23,6 +23,30 @@ interface QueueResponse {
   entries: QueueEntry[];
 }
 
+const MUTE_STORAGE_KEY = "pr-queue-muted";
+
+function playNotificationSound() {
+  try {
+    const Ctx =
+      window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+    if (!Ctx) return;
+    const ctx = new Ctx();
+    const oscillator = ctx.createOscillator();
+    const gain = ctx.createGain();
+    oscillator.connect(gain);
+    gain.connect(ctx.destination);
+    oscillator.type = "sine";
+    oscillator.frequency.setValueAtTime(523.25, ctx.currentTime);
+    oscillator.frequency.exponentialRampToValueAtTime(659.25, ctx.currentTime + 0.1);
+    gain.gain.setValueAtTime(0.1, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
+    oscillator.start(ctx.currentTime);
+    oscillator.stop(ctx.currentTime + 0.3);
+  } catch {
+    // ignore audio errors
+  }
+}
+
 function repositoryMatches(filter: string, repository: string): boolean {
   const trimmed = filter.trim();
   if (!trimmed) return true;
@@ -36,6 +60,14 @@ function repositoryMatches(filter: string, repository: string): boolean {
 export function App() {
   const [queue, setQueue] = useState<QueueResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [muted, setMuted] = useState(() => {
+    try {
+      return localStorage.getItem(MUTE_STORAGE_KEY) === "true";
+    } catch {
+      return false;
+    }
+  });
+  const previousIdsRef = useRef<Set<string>>(new Set());
   const [filter, setFilter] = useState("");
 
   useEffect(() => {
@@ -49,6 +81,20 @@ export function App() {
           throw new Error(`Queue unavailable (${response.status})`);
         const next = (await response.json()) as QueueResponse;
         if (!cancelled) {
+          const previousIds = previousIdsRef.current;
+          const currentIds = new Set(
+            next.entries.map((e) => `${e.repository}-${e.number}`),
+          );
+          if (previousIds.size > 0) {
+            for (const entry of next.entries) {
+              const id = `${entry.repository}-${entry.number}`;
+              if (!previousIds.has(id)) {
+                if (!muted) playNotificationSound();
+                break;
+              }
+            }
+          }
+          previousIdsRef.current = currentIds;
           setQueue(next);
           setError(null);
         }
@@ -67,7 +113,20 @@ export function App() {
       cancelled = true;
       window.clearInterval(interval);
     };
-  }, []);
+  }, [muted]);
+
+  const toggleMute = () => {
+    const next = !muted;
+    setMuted(next);
+    try {
+      localStorage.setItem(MUTE_STORAGE_KEY, String(next));
+    } catch {
+      // ignore storage errors
+    }
+    if (!next) {
+      playNotificationSound();
+    }
+  };
 
   const allEntries = queue?.entries ?? [];
   const filteredEntries = allEntries.filter((entry) =>
@@ -109,6 +168,33 @@ export function App() {
         <span>
           {queue ? `Updated ${formatTime(queue.updatedAt)}` : "Connecting…"}
         </span>
+        <span className="status-divider" />
+        <button
+          type="button"
+          className="mute-toggle"
+          onClick={toggleMute}
+          aria-label={muted ? "Unmute notifications" : "Mute notifications"}
+          title={muted ? "Unmute notifications" : "Mute notifications"}
+        >
+          {muted ? (
+            <>
+              <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+                <line x1="23" y1="9" x2="17" y2="15" />
+                <line x1="17" y1="9" x2="23" y2="15" />
+              </svg>
+              <span>Muted</span>
+            </>
+          ) : (
+            <>
+              <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+                <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07" />
+              </svg>
+              <span>Sound on</span>
+            </>
+          )}
+        </button>
       </section>
 
       {error && (
