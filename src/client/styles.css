@@ -99,6 +99,51 @@ h1 {
     12px DM Mono,
     monospace;
 }
+.filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 18px;
+  padding: 14px 16px;
+  border: 1px solid #303844;
+  border-radius: 12px;
+  background: #171b22;
+}
+.filter-label {
+  flex: 0 0 auto;
+  color: #87909d;
+  font:
+    500 11px/1 DM Mono,
+    monospace;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.filter-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 8px 12px;
+  border: 1px solid #303844;
+  border-radius: 8px;
+  color: #f5f3ef;
+  background: #101318;
+  font:
+    13px DM Mono,
+    monospace;
+}
+.filter-input::placeholder {
+  color: #5a6370;
+}
+.filter-input:focus {
+  outline: none;
+  border-color: #95d7bb;
+}
+.filter-hint {
+  flex: 0 0 auto;
+  color: #5a6370;
+  font:
+    11px DM Mono,
+    monospace;
+}
 .live-dot {
   width: 7px;
   height: 7px;
