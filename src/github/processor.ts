@@ -71,7 +71,10 @@ export function createWebhookProcessor(options: {
       repository.owner.login.toLowerCase() !== config.organization.toLowerCase()
     )
       return null;
-    if (!config.repositorySet.has(repository.full_name.toLowerCase()))
+    if (
+      config.repositorySet.size > 0 &&
+      !config.repositorySet.has(repository.full_name.toLowerCase())
+    )
       return null;
     return ensureOrganizationAndRepository(
       client,

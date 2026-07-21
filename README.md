@@ -62,7 +62,7 @@ ignored_authors:
   - renovate[bot]
 ```
 
-Repository names must belong to the configured organization. Author matching is case-insensitive. Configuration changes do not backfill previously ignored pull requests.
+`repositories` is optional. Omitting it or setting it to an empty array includes all repositories in the organization. Repository names must belong to the configured organization. Author matching is case-insensitive. Configuration changes do not backfill previously ignored pull requests.
 
 ## GitHub App
 
