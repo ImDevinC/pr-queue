@@ -20,7 +20,6 @@ Requirements: Node.js 22 and PostgreSQL 15 or newer.
 ```sh
 cp .env.example .env
 npm install
-npm run db:migrate
 npm run dev
 ```
 
@@ -35,7 +34,7 @@ The production server serves the built React app and exposes the webhook at `/gi
 
 ## Docker Compose
 
-Docker Compose builds the app image, starts PostgreSQL, waits for PostgreSQL to become healthy, runs the schema migration, and starts the app:
+Docker Compose builds the app image, starts PostgreSQL, waits for PostgreSQL to become healthy, and starts the app. The app runs its schema migration on startup:
 
 ```sh
 cp .env.example .env
@@ -98,7 +97,7 @@ Set these secrets through your deployment platform or Secret Manager:
 
 ## Cloud SQL
 
-Run `npm run db:migrate` as a release step against the target `DATABASE_URL`, then start the service. Cloud SQL is the source of truth. Memorystore is intentionally not required for this workload; webhook delivery retries and queue ordering are database-backed.
+Start the service normally against the target `DATABASE_URL`. The app runs its schema migration on startup. Cloud SQL is the source of truth. Memorystore is intentionally not required for this workload; webhook delivery retries and queue ordering are database-backed.
 
 ## Verification
 
