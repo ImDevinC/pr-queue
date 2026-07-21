@@ -1,0 +1,8 @@
+organization: imdevinc
+
+repositories:
+  - imdevinc/fifa-bot
+
+ignored_authors:
+  - dependabot[bot]
+  - renovate[bot]

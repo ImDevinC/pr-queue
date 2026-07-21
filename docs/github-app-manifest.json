@@ -1,0 +1,26 @@
+{
+  "name": "PR Queue",
+  "url": "https://your-host.example",
+  "hook_attributes": {
+    "url": "https://your-host.example/github/webhook",
+    "active": true
+  },
+  "redirect_url": "https://your-host.example",
+  "public": false,
+  "default_permissions": {
+    "administration": "read",
+    "actions": "read",
+    "checks": "read",
+    "commit_statuses": "read",
+    "metadata": "read",
+    "pull_requests": "read"
+  },
+  "default_events": [
+    "check_run",
+    "check_suite",
+    "pull_request",
+    "pull_request_review",
+    "status",
+    "workflow_run"
+  ]
+}
