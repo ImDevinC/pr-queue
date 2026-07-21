@@ -4,6 +4,7 @@ import Fastify from "fastify";
 import fastifyStatic from "@fastify/static";
 import { loadConfig } from "./config.js";
 import { createPool } from "./db/client.js";
+import { migrateDatabase } from "./db/migrate.js";
 import { applyConfiguration, getQueue } from "./db/storage.js";
 import { loadEnvironment } from "./env.js";
 import { createGithubApi } from "./github/api.js";
@@ -12,6 +13,7 @@ import { createWebhookProcessor } from "./github/processor.js";
 const environment = loadEnvironment();
 const config = await loadConfig(environment.CONFIG_PATH);
 const pool = createPool(environment.DATABASE_URL);
+await migrateDatabase(pool);
 await applyConfiguration(pool, config);
 const github = createGithubApi({
   appId: environment.GITHUB_APP_ID,
