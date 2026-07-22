@@ -57,13 +57,13 @@ describe("queue state", () => {
     ).toBe(10);
   });
 
-  it("does not requeue an unreviewed pull request on synchronize", () => {
+  it("requeues an unreviewed pull request on synchronize", () => {
     const result = applyQueueEvent(
       { ...activeState, lastReviewedSha: null },
       { kind: "synchronize", headSha: "new-sha", hasSubmittedReview: false },
       10,
     );
-    expect(result.order).toBe(4);
+    expect(result.order).toBe(10);
   });
 });
 
