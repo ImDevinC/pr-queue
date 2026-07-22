@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useThemeMode } from "./ThemeContext.js";
 import {
   Box,
   Container,
@@ -26,6 +27,8 @@ import {
   OpenInNew,
   Circle,
   FilterList,
+  Brightness4,
+  Brightness7,
 } from "@mui/icons-material";
 
 type Status = "passing" | "failing" | "pending" | "unknown";
@@ -97,6 +100,7 @@ export function App() {
   });
   const previousIdsRef = useRef<Set<string>>(new Set());
   const [filter, setFilter] = useState("");
+  const { mode, toggleTheme } = useThemeMode();
 
   useEffect(() => {
     let cancelled = false;
@@ -183,6 +187,11 @@ export function App() {
           <Tooltip title={muted ? "Unmute notifications" : "Mute notifications"}>
             <IconButton color="inherit" onClick={toggleMute} size="small">
               {muted ? <VolumeOff /> : <VolumeUp />}
+            </IconButton>
+          </Tooltip>
+          <Tooltip title={mode === "dark" ? "Switch to light mode" : "Switch to dark mode"}>
+            <IconButton color="inherit" onClick={toggleTheme} size="small">
+              {mode === "dark" ? <Brightness7 /> : <Brightness4 />}
             </IconButton>
           </Tooltip>
         </Toolbar>
