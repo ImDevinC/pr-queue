@@ -1,4 +1,19 @@
 import { useEffect, useRef, useState } from "react";
+import Box from "@mui/material/Box";
+import Container from "@mui/material/Container";
+import Typography from "@mui/material/Typography";
+import Card from "@mui/material/Card";
+import CardContent from "@mui/material/CardContent";
+import Chip from "@mui/material/Chip";
+import TextField from "@mui/material/TextField";
+import Button from "@mui/material/Button";
+import Avatar from "@mui/material/Avatar";
+import Divider from "@mui/material/Divider";
+import Alert from "@mui/material/Alert";
+import VolumeUpIcon from "@mui/icons-material/VolumeUp";
+import VolumeOffIcon from "@mui/icons-material/VolumeOff";
+import OpenInNewIcon from "@mui/icons-material/OpenInNew";
+import CircleIcon from "@mui/icons-material/Circle";
 
 type Status = "passing" | "failing" | "pending" | "unknown";
 type ReviewState = "pending" | "approved" | "changes_requested" | "commented";
@@ -137,114 +152,228 @@ export function App() {
   const isFiltering = filter.trim().length > 0;
 
   return (
-    <main className="shell">
-      <header className="masthead">
-        <div>
-          <p className="eyebrow">Review operations</p>
-          <h1>PR Queue</h1>
-          <p className="lede">
+    <Container maxWidth="lg" sx={{ py: { xs: 5, md: 9 }, px: { xs: 2, md: 3 } }}>
+      <Box
+        sx={{
+          display: "flex",
+          alignItems: "flex-end",
+          justifyContent: "space-between",
+          gap: 3.5,
+          pb: 5.25,
+          flexDirection: { xs: "column", md: "row" },
+          alignItemsStart: { xs: "flex-start", md: "flex-end" },
+        }}
+      >
+        <Box>
+          <Typography variant="overline" color="primary" sx={{ mb: 2, display: "block" }}>
+            Review operations
+          </Typography>
+          <Typography variant="h1" sx={{ mb: 1.75 }}>
+            PR Queue
+          </Typography>
+          <Typography variant="body1" color="text.secondary" sx={{ maxWidth: 440 }}>
             A clear line of sight from ready for review to merged.
-          </p>
-        </div>
-        <div
-          className="queue-count"
+          </Typography>
+        </Box>
+        <Box
+          sx={{
+            minWidth: 140,
+            p: 2.25,
+            border: "1px solid",
+            borderColor: "divider",
+            borderRadius: 3.5,
+            bgcolor: "background.paper",
+          }}
           aria-label={`${visibleCount} pull requests waiting`}
         >
-          <strong>{visibleCount}</strong>
-          <span>
+          <Typography
+            variant="h3"
+            color="primary"
+            sx={{
+              fontSize: 43,
+              lineHeight: 1,
+              letterSpacing: "-0.07em",
+              fontWeight: 700,
+            }}
+          >
+            {visibleCount}
+          </Typography>
+          <Typography
+            variant="caption"
+            color="text.secondary"
+            sx={{ mt: 1, display: "block" }}
+          >
             {isFiltering
               ? `of ${totalCount} ${totalCount === 1 ? "PR" : "PRs"}`
               : visibleCount === 1
                 ? "PR waiting"
                 : "PRs waiting"}
-          </span>
-        </div>
-      </header>
+          </Typography>
+        </Box>
+      </Box>
 
-      <section className="status-bar" aria-live="polite">
-        <span className="live-dot" />
+      <Box
+        sx={{
+          display: "flex",
+          alignItems: "center",
+          gap: 1.25,
+          py: 1.625,
+          borderTop: "1px solid",
+          borderBottom: "1px solid",
+          borderColor: "divider",
+          color: "text.secondary",
+          fontFamily: '"DM Mono", monospace',
+          fontSize: 12,
+        }}
+        aria-live="polite"
+      >
+        <Box
+          sx={{
+            width: 7,
+            height: 7,
+            borderRadius: "50%",
+            bgcolor: "primary.main",
+            boxShadow: (theme) => `0 0 0 4px ${theme.palette.primary.main}1f`,
+          }}
+        />
         <span>Live queue</span>
-        <span className="status-divider" />
+        <Divider
+          orientation="vertical"
+          flexItem
+          sx={{ mx: 0.375, bgcolor: "#3a424e", width: 1 }}
+        />
         <span>
           {queue ? `Updated ${formatTime(queue.updatedAt)}` : "Connecting…"}
         </span>
-        <span className="status-divider" />
-        <button
-          type="button"
-          className="mute-toggle"
+        <Divider
+          orientation="vertical"
+          flexItem
+          sx={{ mx: 0.375, bgcolor: "#3a424e", width: 1 }}
+        />
+        <Button
+          variant="outlined"
+          size="small"
           onClick={toggleMute}
           aria-label={muted ? "Unmute notifications" : "Mute notifications"}
           title={muted ? "Unmute notifications" : "Mute notifications"}
+          startIcon={muted ? <VolumeOffIcon sx={{ fontSize: 14 }} /> : <VolumeUpIcon sx={{ fontSize: 14 }} />}
+          sx={{
+            borderColor: "divider",
+            color: "text.secondary",
+            bgcolor: "background.paper",
+            fontSize: 12,
+            py: 0.5,
+            px: 1.25,
+            "&:hover": { bgcolor: "#1e232b" },
+          }}
         >
-          {muted ? (
-            <>
-              <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
-                <line x1="23" y1="9" x2="17" y2="15" />
-                <line x1="17" y1="9" x2="23" y2="15" />
-              </svg>
-              <span>Muted</span>
-            </>
-          ) : (
-            <>
-              <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
-                <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07" />
-              </svg>
-              <span>Sound on</span>
-            </>
-          )}
-        </button>
-      </section>
+          {muted ? "Muted" : "Sound on"}
+        </Button>
+      </Box>
 
       {error && (
-        <div className="notice error">{error}. Retrying automatically.</div>
+        <Alert
+          severity="error"
+          sx={{
+            mt: 3.25,
+            borderColor: "#73404a",
+            color: "#ffb2ae",
+            bgcolor: "#171b22",
+            "& .MuiAlert-icon": { color: "#ff918b" },
+          }}
+        >
+          {error}. Retrying automatically.
+        </Alert>
       )}
 
       {!queue && !error && (
-        <div className="notice">Loading the review queue…</div>
+        <Alert severity="info" sx={{ mt: 3.25 }}>
+          Loading the review queue…
+        </Alert>
       )}
 
       {queue && (
-        <div className="filter-bar">
-          <label htmlFor="repo-filter" className="filter-label">
+        <Box
+          sx={{
+            display: "flex",
+            alignItems: "center",
+            gap: 1.5,
+            mt: 2.25,
+            p: 2,
+            border: "1px solid",
+            borderColor: "divider",
+            borderRadius: 3,
+            bgcolor: "background.paper",
+          }}
+        >
+          <Typography variant="caption" color="text.secondary" sx={{ flexShrink: 0 }}>
             Filter by repository
-          </label>
-          <input
+          </Typography>
+          <TextField
             id="repo-filter"
-            className="filter-input"
-            type="text"
+            size="small"
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
             placeholder="e.g. terra or ImDevinC/*"
             aria-describedby="repo-filter-hint"
+            sx={{ flex: 1, minWidth: 0 }}
           />
-          <span id="repo-filter-hint" className="filter-hint">
+          <Typography
+            id="repo-filter-hint"
+            variant="caption"
+            color="text.secondary"
+            sx={{ flexShrink: 0, opacity: 0.5 }}
+          >
             Use * as wildcard
-          </span>
-        </div>
+          </Typography>
+        </Box>
       )}
 
       {queue && filteredEntries.length === 0 && (
-        <section className="empty-state">
-          <div className="empty-mark">✓</div>
-          <h2>
-            {isFiltering
-              ? "No matching pull requests"
-              : "Nothing waiting"}
-          </h2>
-          <p>
+        <Box
+          sx={{
+            mt: 2.75,
+            p: 10,
+            border: "1px dashed",
+            borderColor: "#39434f",
+            borderRadius: 3.5,
+            textAlign: "center",
+            bgcolor: "#15191f",
+          }}
+        >
+          <Box
+            sx={{
+              display: "grid",
+              placeItems: "center",
+              width: 48,
+              height: 48,
+              mx: "auto",
+              mb: 2.25,
+              borderRadius: "50%",
+              bgcolor: "primary.main",
+              color: "background.default",
+              fontSize: 24,
+              fontWeight: 800,
+            }}
+          >
+            ✓
+          </Box>
+          <Typography variant="h5" sx={{ mb: 1, letterSpacing: "-0.04em" }}>
+            {isFiltering ? "No matching pull requests" : "Nothing waiting"}
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
             {isFiltering
               ? "Try adjusting your filter pattern."
               : "The queue is clear. This is either excellent process or suspicious timing."}
-          </p>
-        </section>
+          </Typography>
+        </Box>
       )}
 
       {queue && filteredEntries.length > 0 && (
-        <section
-          className="queue"
+        <Box
+          component="section"
           aria-label="Pull requests waiting for review"
+          sx={{ display: "grid", gap: 1.75, mt: 2.75 }}
         >
           {filteredEntries.map((entry) => (
             <PullRequestCard
@@ -252,132 +381,247 @@ export function App() {
               key={`${entry.repository}-${entry.number}`}
             />
           ))}
-        </section>
+        </Box>
       )}
-    </main>
+    </Container>
   );
 }
 
 function PullRequestCard({ entry }: { entry: QueueEntry }) {
   return (
-    <article className="pr-card">
-      <div className="rank" aria-label={`${entry.ahead} pull requests ahead`}>
-        <span className="rank-number">
-          {String(entry.position).padStart(2, "0")}
-        </span>
-        <span className="rank-label">
-          {entry.ahead === 0 ? "up next" : `${entry.ahead} ahead`}
-        </span>
-      </div>
-      <div className="pr-main">
-        <div className="pr-heading">
-          <div className="repo-line">
-            <span className="repo-name">{entry.repository}</span>
-            <span className="pr-number">#{entry.number}</span>
-          </div>
-          <a
-            className="github-link"
-            href={entry.url}
-            target="_blank"
-            rel="noreferrer"
+    <Card>
+      <Box
+        sx={{
+          display: "grid",
+          gridTemplateColumns: { xs: "1fr", sm: "112px 1fr" },
+          minWidth: 0,
+          overflow: "hidden",
+        }}
+      >
+        <Box
+          sx={{
+            display: "flex",
+            flexDirection: { xs: "row", sm: "column" },
+            justifyContent: { xs: "flex-start", sm: "center" },
+            alignItems: "center",
+            gap: { xs: 1.5, sm: 1.25 },
+            p: { xs: "12px 18px", sm: "22px 10px" },
+            borderRight: { xs: 0, sm: "1px solid" },
+            borderBottom: { xs: "1px solid", sm: 0 },
+            borderColor: "divider",
+            bgcolor: "#14181e",
+          }}
+          aria-label={`${entry.ahead} pull requests ahead`}
+        >
+          <Typography
+            sx={{
+              color: "text.primary",
+              fontFamily: '"DM Mono", monospace',
+              fontWeight: 500,
+              fontSize: 29,
+              letterSpacing: "-0.08em",
+            }}
           >
-            Open on GitHub <span aria-hidden="true">↗</span>
-          </a>
-        </div>
-        <h2>{entry.title}</h2>
-        <div className="meta-row">
-          <span className="author">
-            {entry.author.avatarUrl ? (
-              <img src={entry.author.avatarUrl} alt="" />
-            ) : (
-              <span className="avatar-fallback">
-                {entry.author.login.slice(0, 1).toUpperCase()}
-              </span>
-            )}
-            <span>{entry.author.login}</span>
-          </span>
-          <span className="waiting">
-            Waiting {formatWaiting(entry.waitingSince)}
-          </span>
-        </div>
-        <div className="details-grid">
-          <div>
-            <span className="detail-label">Review</span>
-            <StatusPill
-              value={entry.reviewState}
-              label={formatReview(entry.reviewState)}
-            />
-          </div>
-          <div>
-            <span className="detail-label">Checks</span>
-            <StatusPill
-              value={entry.statuses.checks}
-              label={formatStatus(entry.statuses.checks)}
-            />
-          </div>
-          <div>
-            <span className="detail-label">Actions</span>
-            <StatusPill
-              value={entry.statuses.workflows}
-              label={formatStatus(entry.statuses.workflows)}
-            />
-          </div>
-          <div>
-            <span className="detail-label">Statuses</span>
-            <StatusPill
-              value={entry.statuses.commits}
-              label={formatStatus(entry.statuses.commits)}
-            />
-          </div>
-        </div>
-        <div className="reviewers">
-          <div>
-            <span className="detail-label">Requested reviewers</span>
-            <div className="tag-list">
-              {entry.requestedReviewers.length > 0 ? (
-                entry.requestedReviewers.map((reviewer) => (
-                  <span
-                    className="tag"
-                    key={`${reviewer.type}-${reviewer.login}`}
-                  >
-                    {reviewer.type === "Team"
-                      ? `@${reviewer.login} team`
-                      : `@${reviewer.login}`}
-                  </span>
-                ))
+            {String(entry.position).padStart(2, "0")}
+          </Typography>
+          <Typography
+            variant="caption"
+            color="primary"
+            sx={{ fontSize: 9, textAlign: "center" }}
+          >
+            {entry.ahead === 0 ? "up next" : `${entry.ahead} ahead`}
+          </Typography>
+        </Box>
+
+        <CardContent sx={{ minWidth: 0, p: { xs: "19px 18px 21px", sm: "23px 26px 25px" } }}>
+          <Box
+            sx={{
+              display: "flex",
+              alignItems: { xs: "flex-start", sm: "center" },
+              justifyContent: "space-between",
+              gap: 2.25,
+              flexDirection: { xs: "column", sm: "row" },
+            }}
+          >
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1.25, minWidth: 0, fontFamily: '"DM Mono", monospace', fontSize: 12 }}>
+              <Typography
+                component="span"
+                sx={{
+                  overflow: "hidden",
+                  color: "primary.main",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                  fontFamily: '"DM Mono", monospace',
+                  fontSize: 12,
+                }}
+              >
+                {entry.repository}
+              </Typography>
+              <Typography
+                component="span"
+                color="text.secondary"
+                sx={{ fontFamily: '"DM Mono", monospace', fontSize: 12 }}
+              >
+                #{entry.number}
+              </Typography>
+            </Box>
+            <Typography
+              component="a"
+              href={entry.url}
+              target="_blank"
+              rel="noreferrer"
+              sx={{
+                flexShrink: 0,
+                color: "text.secondary",
+                fontFamily: '"DM Mono", monospace',
+                fontSize: 11,
+                textDecoration: "none",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 0.5,
+                "&:hover": { color: "text.primary" },
+              }}
+            >
+              Open on GitHub <OpenInNewIcon sx={{ fontSize: 12 }} />
+            </Typography>
+          </Box>
+
+          <Typography
+            variant="h2"
+            sx={{
+              mt: 1.625,
+              mb: 1.75,
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: { xs: "normal", sm: "nowrap" },
+            }}
+          >
+            {entry.title}
+          </Typography>
+
+          <Box sx={{ display: "flex", alignItems: "center", gap: 2.125, fontSize: 12, color: "text.secondary" }}>
+            <Box sx={{ display: "inline-flex", alignItems: "center", gap: 1, color: "#d0d4da" }}>
+              {entry.author.avatarUrl ? (
+                <Avatar src={entry.author.avatarUrl} alt="" sx={{ width: 22, height: 22 }} />
               ) : (
-                <span className="muted">None assigned</span>
+                <Avatar sx={{ width: 22, height: 22 }}>
+                  {entry.author.login.slice(0, 1).toUpperCase()}
+                </Avatar>
               )}
-            </div>
-          </div>
-          {entry.requiredReviewers.length > 0 && (
-            <div>
-              <span className="detail-label">Required by branch rules</span>
-              <div className="tag-list">
-                {entry.requiredReviewers.map((reviewer, index) => (
-                  <span
-                    className="tag required"
-                    key={`${reviewer.name}-${index}`}
-                  >
-                    {reviewer.name} · {reviewer.minimumApprovals}{" "}
-                    {reviewer.minimumApprovals === 1 ? "approval" : "approvals"}
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-    </article>
+              <span>{entry.author.login}</span>
+            </Box>
+            <Box component="span" sx={{ color: "#7d8794" }}>
+              Waiting {formatWaiting(entry.waitingSince)}
+            </Box>
+          </Box>
+
+          <Box
+            sx={{
+              display: "grid",
+              gridTemplateColumns: { xs: "repeat(2, minmax(0, 1fr))", sm: "repeat(4, minmax(0, 1fr))" },
+              gap: 1.75,
+              mt: 3.125,
+              py: 2,
+              borderTop: "1px solid",
+              borderBottom: "1px solid",
+              borderColor: "#2c333e",
+            }}
+          >
+            <StatusItem label="Review" value={entry.reviewState} labelFn={formatReview as (s: string) => string} />
+            <StatusItem label="Checks" value={entry.statuses.checks} labelFn={formatStatus as (s: string) => string} />
+            <StatusItem label="Actions" value={entry.statuses.workflows} labelFn={formatStatus as (s: string) => string} />
+            <StatusItem label="Statuses" value={entry.statuses.commits} labelFn={formatStatus as (s: string) => string} />
+          </Box>
+
+          <Box
+            sx={{
+              display: "grid",
+              gridTemplateColumns: { xs: "1fr", sm: "repeat(2, minmax(0, 1fr))" },
+              gap: { xs: 2, sm: 2.5 },
+              mt: 2.25,
+            }}
+          >
+            <Box>
+              <Typography variant="caption" sx={{ display: "block", mb: 1.125 }}>
+                Requested reviewers
+              </Typography>
+              <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.75 }}>
+                {entry.requestedReviewers.length > 0 ? (
+                  entry.requestedReviewers.map((reviewer) => (
+                    <Chip
+                      key={`${reviewer.type}-${reviewer.login}`}
+                      label={
+                        reviewer.type === "Team"
+                          ? `@${reviewer.login} team`
+                          : `@${reviewer.login}`
+                      }
+                      size="small"
+                    />
+                  ))
+                ) : (
+                  <Typography variant="body2" sx={{ color: "#737e8d", fontSize: 12 }}>
+                    None assigned
+                  </Typography>
+                )}
+              </Box>
+            </Box>
+            {entry.requiredReviewers.length > 0 && (
+              <Box>
+                <Typography variant="caption" sx={{ display: "block", mb: 1.125 }}>
+                  Required by branch rules
+                </Typography>
+                <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.75 }}>
+                  {entry.requiredReviewers.map((reviewer, index) => (
+                    <Chip
+                      key={`${reviewer.name}-${index}`}
+                      label={`${reviewer.name} · ${reviewer.minimumApprovals} ${reviewer.minimumApprovals === 1 ? "approval" : "approvals"}`}
+                      size="small"
+                      sx={{
+                        borderColor: "#645638",
+                        color: "#e6cb8d",
+                      }}
+                    />
+                  ))}
+                </Box>
+              </Box>
+            )}
+          </Box>
+        </CardContent>
+      </Box>
+    </Card>
   );
 }
 
-function StatusPill({ value, label }: { value: string; label: string }) {
+function StatusItem({
+  label,
+  value,
+  labelFn,
+}: {
+  label: string;
+  value: string;
+  labelFn: (s: string) => string;
+}) {
+  const colorMap: Record<string, string> = {
+    passing: "#95d7bb",
+    approved: "#95d7bb",
+    failing: "#ff918b",
+    changes_requested: "#ff918b",
+    pending: "#f0c779",
+    unknown: "#9da7b4",
+    commented: "#9da7b4",
+  };
+  const color = colorMap[value] ?? "#9da7b4";
+
   return (
-    <span className={`status-pill ${value}`}>
-      <span className="status-icon" aria-hidden="true" />
-      {label}
-    </span>
+    <Box>
+      <Typography variant="caption" sx={{ display: "block", mb: 1.125, fontSize: 9 }}>
+        {label}
+      </Typography>
+      <Box sx={{ display: "inline-flex", alignItems: "center", gap: 0.875, color: "#b3bac4", fontSize: 12, whiteSpace: "nowrap" }}>
+        <CircleIcon sx={{ fontSize: 7, color }} aria-hidden="true" />
+        <span>{labelFn(value)}</span>
+      </Box>
+    </Box>
   );
 }
 
