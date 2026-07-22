@@ -1,4 +1,32 @@
 import { useEffect, useRef, useState } from "react";
+import {
+  Box,
+  Container,
+  Typography,
+  Card,
+  CardContent,
+  Chip,
+  TextField,
+  IconButton,
+  Avatar,
+  Divider,
+  Alert,
+  AppBar,
+  Toolbar,
+  Badge,
+  Stack,
+  Paper,
+  Grid,
+  Tooltip,
+  Link,
+} from "@mui/material";
+import {
+  VolumeUp,
+  VolumeOff,
+  OpenInNew,
+  Circle,
+  FilterList,
+} from "@mui/icons-material";
 
 type Status = "passing" | "failing" | "pending" | "unknown";
 type ReviewState = "pending" | "approved" | "changes_requested" | "commented";
@@ -137,257 +165,293 @@ export function App() {
   const isFiltering = filter.trim().length > 0;
 
   return (
-    <main className="shell">
-      <header className="masthead">
-        <div>
-          <p className="eyebrow">Review operations</p>
-          <h1>PR Queue</h1>
-          <p className="lede">
-            A clear line of sight from ready for review to merged.
-          </p>
-        </div>
-        <div
-          className="queue-count"
-          aria-label={`${visibleCount} pull requests waiting`}
-        >
-          <strong>{visibleCount}</strong>
-          <span>
-            {isFiltering
-              ? `of ${totalCount} ${totalCount === 1 ? "PR" : "PRs"}`
-              : visibleCount === 1
-                ? "PR waiting"
-                : "PRs waiting"}
-          </span>
-        </div>
-      </header>
+    <Box sx={{ minHeight: "100vh", bgcolor: "background.default" }}>
+      <AppBar position="static" elevation={0}>
+        <Toolbar>
+          <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
+            PR Queue
+          </Typography>
+          <Badge
+            badgeContent={visibleCount}
+            color="secondary"
+            sx={{ mr: 2 }}
+          >
+            <Typography variant="body2" color="inherit">
+              {visibleCount === 1 ? "PR waiting" : "PRs waiting"}
+            </Typography>
+          </Badge>
+          <Tooltip title={muted ? "Unmute notifications" : "Mute notifications"}>
+            <IconButton color="inherit" onClick={toggleMute} size="small">
+              {muted ? <VolumeOff /> : <VolumeUp />}
+            </IconButton>
+          </Tooltip>
+        </Toolbar>
+      </AppBar>
 
-      <section className="status-bar" aria-live="polite">
-        <span className="live-dot" />
-        <span>Live queue</span>
-        <span className="status-divider" />
-        <span>
-          {queue ? `Updated ${formatTime(queue.updatedAt)}` : "Connecting…"}
-        </span>
-        <span className="status-divider" />
-        <button
-          type="button"
-          className="mute-toggle"
-          onClick={toggleMute}
-          aria-label={muted ? "Unmute notifications" : "Mute notifications"}
-          title={muted ? "Unmute notifications" : "Mute notifications"}
-        >
-          {muted ? (
-            <>
-              <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
-                <line x1="23" y1="9" x2="17" y2="15" />
-                <line x1="17" y1="9" x2="23" y2="15" />
-              </svg>
-              <span>Muted</span>
-            </>
-          ) : (
-            <>
-              <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
-                <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07" />
-              </svg>
-              <span>Sound on</span>
-            </>
+      <Container maxWidth="lg" sx={{ py: 3 }}>
+        <Stack spacing={2}>
+          <Box
+            sx={{
+              display: "flex",
+              alignItems: "center",
+              gap: 1,
+              color: "text.secondary",
+              typography: "body2",
+            }}
+            aria-live="polite"
+          >
+            <Circle color="success" sx={{ fontSize: 12 }} />
+            <span>Live queue</span>
+            <Divider orientation="vertical" flexItem />
+            <span>
+              {queue ? `Updated ${formatTime(queue.updatedAt)}` : "Connecting…"}
+            </span>
+          </Box>
+
+          {error && (
+            <Alert severity="error">{error}. Retrying automatically.</Alert>
           )}
-        </button>
-      </section>
 
-      {error && (
-        <div className="notice error">{error}. Retrying automatically.</div>
-      )}
+          {!queue && !error && (
+            <Alert severity="info">Loading the review queue…</Alert>
+          )}
 
-      {!queue && !error && (
-        <div className="notice">Loading the review queue…</div>
-      )}
+          {queue && (
+            <Paper elevation={1} sx={{ p: 2 }}>
+              <Stack direction="row" spacing={2} sx={{ alignItems: "center" }}>
+                <FilterList color="action" />
+                <TextField
+                  id="repo-filter"
+                  size="small"
+                  label="Filter by repository"
+                  value={filter}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFilter(e.target.value)}
+                  placeholder="e.g. terra or ImDevinC/*"
+                  aria-describedby="repo-filter-hint"
+                  fullWidth
+                />
+                <Typography
+                  id="repo-filter-hint"
+                  variant="caption"
+                  color="text.secondary"
+                  sx={{ whiteSpace: "nowrap" }}
+                >
+                  Use * as wildcard
+                </Typography>
+              </Stack>
+            </Paper>
+          )}
 
-      {queue && (
-        <div className="filter-bar">
-          <label htmlFor="repo-filter" className="filter-label">
-            Filter by repository
-          </label>
-          <input
-            id="repo-filter"
-            className="filter-input"
-            type="text"
-            value={filter}
-            onChange={(e) => setFilter(e.target.value)}
-            placeholder="e.g. terra or ImDevinC/*"
-            aria-describedby="repo-filter-hint"
-          />
-          <span id="repo-filter-hint" className="filter-hint">
-            Use * as wildcard
-          </span>
-        </div>
-      )}
+          {isFiltering && (
+            <Typography variant="body2" color="text.secondary">
+              Showing {visibleCount} of {totalCount} {totalCount === 1 ? "PR" : "PRs"}
+            </Typography>
+          )}
 
-      {queue && filteredEntries.length === 0 && (
-        <section className="empty-state">
-          <div className="empty-mark">✓</div>
-          <h2>
-            {isFiltering
-              ? "No matching pull requests"
-              : "Nothing waiting"}
-          </h2>
-          <p>
-            {isFiltering
-              ? "Try adjusting your filter pattern."
-              : "The queue is clear. This is either excellent process or suspicious timing."}
-          </p>
-        </section>
-      )}
+          {queue && filteredEntries.length === 0 && (
+            <Paper elevation={1} sx={{ p: 4, textAlign: "center" }}>
+              <Typography variant="h5" gutterBottom>
+                {isFiltering ? "No matching pull requests" : "Nothing waiting"}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                {isFiltering
+                  ? "Try adjusting your filter pattern."
+                  : "The queue is clear."}
+              </Typography>
+            </Paper>
+          )}
 
-      {queue && filteredEntries.length > 0 && (
-        <section
-          className="queue"
-          aria-label="Pull requests waiting for review"
-        >
-          {filteredEntries.map((entry) => (
-            <PullRequestCard
-              entry={entry}
-              key={`${entry.repository}-${entry.number}`}
-            />
-          ))}
-        </section>
-      )}
-    </main>
+          {queue && filteredEntries.length > 0 && (
+            <Stack spacing={2} component="section" aria-label="Pull requests waiting for review">
+              {filteredEntries.map((entry) => (
+                <PullRequestCard
+                  entry={entry}
+                  key={`${entry.repository}-${entry.number}`}
+                />
+              ))}
+            </Stack>
+          )}
+        </Stack>
+      </Container>
+    </Box>
   );
 }
 
 function PullRequestCard({ entry }: { entry: QueueEntry }) {
   return (
-    <article className="pr-card">
-      <div className="rank" aria-label={`${entry.ahead} pull requests ahead`}>
-        <span className="rank-number">
-          {String(entry.position).padStart(2, "0")}
-        </span>
-        <span className="rank-label">
-          {entry.ahead === 0 ? "up next" : `${entry.ahead} ahead`}
-        </span>
-      </div>
-      <div className="pr-main">
-        <div className="pr-heading">
-          <div className="repo-line">
-            <span className="repo-name">{entry.repository}</span>
-            <span className="pr-number">#{entry.number}</span>
-          </div>
-          <a
-            className="github-link"
-            href={entry.url}
-            target="_blank"
-            rel="noreferrer"
+    <Card elevation={2}>
+      <CardContent>
+        <Stack spacing={2}>
+          <Box
+            sx={{
+              display: "flex",
+              alignItems: { xs: "flex-start", sm: "center" },
+              justifyContent: "space-between",
+              gap: 2,
+              flexDirection: { xs: "column", sm: "row" },
+            }}
           >
-            Open on GitHub <span aria-hidden="true">↗</span>
-          </a>
-        </div>
-        <h2>{entry.title}</h2>
-        <div className="meta-row">
-          <span className="author">
-            {entry.author.avatarUrl ? (
-              <img src={entry.author.avatarUrl} alt="" />
-            ) : (
-              <span className="avatar-fallback">
-                {entry.author.login.slice(0, 1).toUpperCase()}
-              </span>
-            )}
-            <span>{entry.author.login}</span>
-          </span>
-          <span className="waiting">
-            Waiting {formatWaiting(entry.waitingSince)}
-          </span>
-        </div>
-        <div className="details-grid">
-          <div>
-            <span className="detail-label">Review</span>
-            <StatusPill
-              value={entry.reviewState}
-              label={formatReview(entry.reviewState)}
-            />
-          </div>
-          <div>
-            <span className="detail-label">Checks</span>
-            <StatusPill
-              value={entry.statuses.checks}
-              label={formatStatus(entry.statuses.checks)}
-            />
-          </div>
-          <div>
-            <span className="detail-label">Actions</span>
-            <StatusPill
-              value={entry.statuses.workflows}
-              label={formatStatus(entry.statuses.workflows)}
-            />
-          </div>
-          <div>
-            <span className="detail-label">Statuses</span>
-            <StatusPill
-              value={entry.statuses.commits}
-              label={formatStatus(entry.statuses.commits)}
-            />
-          </div>
-        </div>
-        <div className="reviewers">
-          <div>
-            <span className="detail-label">Requested reviewers</span>
-            <div className="tag-list">
-              {entry.requestedReviewers.length > 0 ? (
-                entry.requestedReviewers.map((reviewer) => (
-                  <span
-                    className="tag"
-                    key={`${reviewer.type}-${reviewer.login}`}
-                  >
-                    {reviewer.type === "Team"
-                      ? `@${reviewer.login} team`
-                      : `@${reviewer.login}`}
-                  </span>
-                ))
+            <Stack direction="row" spacing={1} sx={{ alignItems: "center", minWidth: 0 }}>
+              <Chip
+                label={entry.repository}
+                color="primary"
+                size="small"
+                variant="outlined"
+              />
+              <Typography variant="body2" color="text.secondary">
+                #{entry.number}
+              </Typography>
+            </Stack>
+            <Link
+              href={entry.url}
+              target="_blank"
+              rel="noreferrer"
+              underline="hover"
+              sx={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 0.5,
+                typography: "body2",
+                flexShrink: 0,
+              }}
+            >
+              Open on GitHub <OpenInNew sx={{ fontSize: 16 }} />
+            </Link>
+          </Box>
+
+          <Typography variant="h6" sx={{ wordBreak: "break-word" }}>
+            {entry.title}
+          </Typography>
+
+          <Stack direction="row" spacing={2} sx={{ alignItems: "center" }}>
+            <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
+              {entry.author.avatarUrl ? (
+                <Avatar src={entry.author.avatarUrl} alt="" sx={{ width: 24, height: 24 }} />
               ) : (
-                <span className="muted">None assigned</span>
+                <Avatar sx={{ width: 24, height: 24 }}>
+                  {entry.author.login.slice(0, 1).toUpperCase()}
+                </Avatar>
               )}
-            </div>
-          </div>
-          {entry.requiredReviewers.length > 0 && (
-            <div>
-              <span className="detail-label">Required by branch rules</span>
-              <div className="tag-list">
-                {entry.requiredReviewers.map((reviewer, index) => (
-                  <span
-                    className="tag required"
-                    key={`${reviewer.name}-${index}`}
-                  >
-                    {reviewer.name} · {reviewer.minimumApprovals}{" "}
-                    {reviewer.minimumApprovals === 1 ? "approval" : "approvals"}
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-    </article>
+              <Typography variant="body2">{entry.author.login}</Typography>
+            </Stack>
+            <Typography variant="body2" color="text.secondary">
+              Waiting {formatWaiting(entry.waitingSince)}
+            </Typography>
+          </Stack>
+
+          <Divider />
+
+          <Grid container spacing={2}>
+            <Grid size={{ xs: 6, sm: 3 }}>
+              <StatusItem label="Review" value={entry.reviewState} labelFn={formatReview} />
+            </Grid>
+            <Grid size={{ xs: 6, sm: 3 }}>
+              <StatusItem label="Checks" value={entry.statuses.checks} labelFn={formatStatus} />
+            </Grid>
+            <Grid size={{ xs: 6, sm: 3 }}>
+              <StatusItem label="Actions" value={entry.statuses.workflows} labelFn={formatStatus} />
+            </Grid>
+            <Grid size={{ xs: 6, sm: 3 }}>
+              <StatusItem label="Statuses" value={entry.statuses.commits} labelFn={formatStatus} />
+            </Grid>
+          </Grid>
+
+          <Divider />
+
+          <Grid container spacing={2}>
+            <Grid size={{ xs: 12, sm: 6 }}>
+              <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 1 }}>
+                Requested reviewers
+              </Typography>
+              <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
+                {entry.requestedReviewers.length > 0 ? (
+                  entry.requestedReviewers.map((reviewer) => (
+                    <Chip
+                      key={`${reviewer.type}-${reviewer.login}`}
+                      label={
+                        reviewer.type === "Team"
+                          ? `@${reviewer.login} team`
+                          : `@${reviewer.login}`
+                      }
+                      size="small"
+                      variant="outlined"
+                    />
+                  ))
+                ) : (
+                  <Typography variant="body2" color="text.secondary">
+                    None assigned
+                  </Typography>
+                )}
+              </Box>
+            </Grid>
+            {entry.requiredReviewers.length > 0 && (
+              <Grid size={{ xs: 12, sm: 6 }}>
+                <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 1 }}>
+                  Required by branch rules
+                </Typography>
+                <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
+                  {entry.requiredReviewers.map((reviewer, index) => (
+                    <Chip
+                      key={`${reviewer.name}-${index}`}
+                      label={`${reviewer.name} · ${reviewer.minimumApprovals} ${reviewer.minimumApprovals === 1 ? "approval" : "approvals"}`}
+                      size="small"
+                      color="warning"
+                      variant="outlined"
+                    />
+                  ))}
+                </Box>
+              </Grid>
+            )}
+          </Grid>
+        </Stack>
+      </CardContent>
+    </Card>
   );
 }
 
-function StatusPill({ value, label }: { value: string; label: string }) {
+function StatusItem({
+  label,
+  value,
+  labelFn,
+}: {
+  label: string;
+  value: string;
+  labelFn: (s: string) => string;
+}) {
+  const colorMap: Record<string, "success" | "error" | "warning" | "default"> = {
+    passing: "success",
+    approved: "success",
+    failing: "error",
+    changes_requested: "error",
+    pending: "warning",
+    unknown: "default",
+    commented: "default",
+  };
+  const color = colorMap[value] ?? "default";
+
   return (
-    <span className={`status-pill ${value}`}>
-      <span className="status-icon" aria-hidden="true" />
-      {label}
-    </span>
+    <Box>
+      <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 0.5 }}>
+        {label}
+      </Typography>
+      <Chip
+        icon={<Circle sx={{ fontSize: 10 }} />}
+        label={labelFn(value)}
+        size="small"
+        color={color}
+        variant="outlined"
+      />
+    </Box>
   );
 }
 
-function formatStatus(status: Status): string {
+function formatStatus(status: string): string {
   return status === "unknown"
     ? "No signal"
     : status[0].toUpperCase() + status.slice(1);
 }
 
-function formatReview(status: ReviewState): string {
+function formatReview(status: string): string {
   return status === "changes_requested"
     ? "Changes requested"
     : status[0].toUpperCase() + status.slice(1);
