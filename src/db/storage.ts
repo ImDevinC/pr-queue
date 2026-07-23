@@ -154,7 +154,6 @@ export async function applyConfiguration(
   config: QueueConfig,
 ): Promise<void> {
   const repositories = [...config.repositorySet];
-  const ignoredAuthors = [...config.ignoredAuthorSet];
   await client.query(
     `UPDATE repositories SET enabled = $1 OR lower(full_name) = ANY($2::text[]), updated_at = now()`,
     [repositories.length === 0, repositories],
@@ -164,8 +163,7 @@ export async function applyConfiguration(
      FROM pull_requests p
      JOIN repositories r ON r.id = p.repository_id
      WHERE q.pull_request_id = p.id
-       AND (r.enabled = false OR lower(p.author_login) = ANY($1::text[]))`,
-    [ignoredAuthors],
+       AND r.enabled = false`,
   );
 }
 
@@ -432,4 +430,20 @@ export async function findPullRequest(
     [repositoryId, number],
   );
   return result.rows[0] ? Number(result.rows[0].id) : null;
+}
+
+export async function getInstallationIdForOrganization(
+  client: pg.PoolClient,
+  organizationLogin: string,
+): Promise<number | null> {
+  const result = await client.query<{ github_installation_id: string }>(
+    `SELECT i.github_installation_id
+     FROM installations i
+     JOIN organizations o ON o.id = i.organization_id
+     WHERE lower(o.login) = lower($1) AND i.active = true
+     ORDER BY i.created_at DESC
+     LIMIT 1`,
+    [organizationLogin],
+  );
+  return result.rows[0] ? Number(result.rows[0].github_installation_id) : null;
 }

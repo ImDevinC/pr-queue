@@ -111,9 +111,6 @@ export function createWebhookProcessor(options: {
     payload: GithubPullRequestPayload,
   ): Promise<void> {
     const pullRequest = payload.pull_request;
-    const ignored = config.ignoredAuthorSet.has(
-      pullRequest.user.login.toLowerCase(),
-    );
     const ready = shouldActivatePullRequest(payload.action, pullRequest.draft);
 
     const pullRequestId = await withTransaction(async (client) => {
@@ -131,7 +128,6 @@ export function createWebhookProcessor(options: {
       );
 
       if (
-        ignored ||
         payload.action === "closed" ||
         pullRequest.merged ||
         payload.action === "converted_to_draft" ||
