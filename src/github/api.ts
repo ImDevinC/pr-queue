@@ -1,4 +1,41 @@
-import { importPKCS8, SignJWT } from "jose";
+import { createPrivateKey } from "node:crypto";
+import { SignJWT } from "jose";
+import type { GithubPullRequest } from "./types.js";
+
+export interface GithubInstallation {
+  id: number;
+  account: { id: number; login: string };
+}
+
+export interface GithubReview {
+  id: number;
+  user: { id: number; login: string };
+  state: string;
+  commit_id: string;
+  submitted_at: string | null;
+}
+
+export interface GithubCheckRun {
+  id: number;
+  name: string;
+  status: string;
+  conclusion: string | null;
+  head_sha: string;
+}
+
+export interface GithubCommitStatus {
+  id: number;
+  state: string;
+  context: string;
+}
+
+export interface GithubWorkflowRun {
+  id: number;
+  name: string;
+  status: string;
+  conclusion: string | null;
+  head_sha: string;
+}
 
 export interface GithubApi {
   getBranchRules(
@@ -9,6 +46,36 @@ export interface GithubApi {
   getInstallationRepositories(
     installationId: number,
   ): Promise<Array<{ id: number; full_name: string }>>;
+  getPullRequest(
+    repository: string,
+    number: number,
+    installationId: number,
+  ): Promise<GithubPullRequest>;
+  getRepository(
+    repository: string,
+    installationId: number,
+  ): Promise<{ id: number; full_name: string; owner: { id: number; login: string } }>;
+  getInstallations(): Promise<GithubInstallation[]>;
+  getPullRequestReviews(
+    repository: string,
+    number: number,
+    installationId: number,
+  ): Promise<GithubReview[]>;
+  getCheckRuns(
+    repository: string,
+    ref: string,
+    installationId: number,
+  ): Promise<GithubCheckRun[]>;
+  getCommitStatuses(
+    repository: string,
+    ref: string,
+    installationId: number,
+  ): Promise<GithubCommitStatus[]>;
+  getWorkflowRuns(
+    repository: string,
+    headSha: string,
+    installationId: number,
+  ): Promise<GithubWorkflowRun[]>;
 }
 
 export function createGithubApi(options: {
@@ -19,10 +86,7 @@ export function createGithubApi(options: {
   const tokens = new Map<number, { value: string; expiresAt: number }>();
 
   async function appJwt(): Promise<string> {
-    const key = await importPKCS8(
-      options.privateKey.replace(/\\n/g, "\n"),
-      "RS256",
-    );
+    const key = createPrivateKey(options.privateKey.replace(/\\n/g, "\n"));
     return new SignJWT({})
       .setProtectedHeader({ alg: "RS256" })
       .setIssuer(String(options.appId))
@@ -87,6 +151,73 @@ export function createGithubApi(options: {
         repositories: Array<{ id: number; full_name: string }>;
       };
       return result.repositories;
+    },
+    async getPullRequest(repository, number, installationId) {
+      return request(
+        `/repos/${repository}/pulls/${number}`,
+        installationId,
+      ) as Promise<GithubPullRequest>;
+    },
+    async getRepository(repository, installationId) {
+      return request(
+        `/repos/${repository}`,
+        installationId,
+      ) as Promise<{
+        id: number;
+        full_name: string;
+        owner: { id: number; login: string };
+      }>;
+    },
+    async getInstallations() {
+      const response = await fetch(
+        `${options.apiUrl}/app/installations?per_page=100`,
+        {
+          headers: {
+            Authorization: `Bearer ${await appJwt()}`,
+            Accept: "application/vnd.github+json",
+            "X-GitHub-Api-Version": "2022-11-28",
+          },
+        },
+      );
+      if (!response.ok)
+        throw new Error(
+          `GitHub installations request failed: ${response.status}`,
+        );
+      return response.json() as Promise<GithubInstallation[]>;
+    },
+    async getPullRequestReviews(repository, number, installationId) {
+      const result = (await request(
+        `/repos/${repository}/pulls/${number}/reviews`,
+        installationId,
+      )) as GithubReview[];
+      return result;
+    },
+    async getCheckRuns(repository, ref, installationId) {
+      const result = (await request(
+        `/repos/${repository}/commits/${ref}/check-runs?per_page=100`,
+        installationId,
+      )) as {
+        check_runs: GithubCheckRun[];
+      };
+      return result.check_runs ?? [];
+    },
+    async getCommitStatuses(repository, ref, installationId) {
+      const result = (await request(
+        `/repos/${repository}/commits/${ref}/status`,
+        installationId,
+      )) as {
+        statuses: GithubCommitStatus[];
+      };
+      return result.statuses ?? [];
+    },
+    async getWorkflowRuns(repository, headSha, installationId) {
+      const result = (await request(
+        `/repos/${repository}/actions/runs?head_sha=${headSha}&per_page=100`,
+        installationId,
+      )) as {
+        workflow_runs: GithubWorkflowRun[];
+      };
+      return result.workflow_runs ?? [];
     },
   };
 }

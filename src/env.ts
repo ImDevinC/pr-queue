@@ -12,6 +12,8 @@ const envSchema = z.object({
   GITHUB_APP_PRIVATE_KEY: z.string().min(1),
   GITHUB_WEBHOOK_SECRET: z.string().min(1),
   GITHUB_API_URL: z.string().url().default("https://api.github.com"),
+  SLACK_BOT_TOKEN: z.string().min(1),
+  SLACK_SIGNING_SECRET: z.string().min(1),
 });
 
 export type Environment = z.infer<typeof envSchema>;
