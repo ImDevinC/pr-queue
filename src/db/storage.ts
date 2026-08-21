@@ -432,6 +432,49 @@ export async function findPullRequest(
   return result.rows[0] ? Number(result.rows[0].id) : null;
 }
 
+export async function getActiveQueuedPullRequests(
+  client: pg.Pool | pg.PoolClient,
+): Promise<
+  Array<{
+    pullRequestId: number;
+    repositoryId: number;
+    organizationId: number;
+    number: number;
+    repository: string;
+    organizationLogin: string;
+  }>
+> {
+  const result = await client.query<{
+    pull_request_id: string;
+    repository_id: string;
+    organization_id: string;
+    number: number;
+    repository: string;
+    organization_login: string;
+  }>(
+    `SELECT
+       p.id AS pull_request_id,
+       r.id AS repository_id,
+       o.id AS organization_id,
+       p.number,
+       r.full_name AS repository,
+       o.login AS organization_login
+     FROM queue_entries q
+     JOIN pull_requests p ON p.id = q.pull_request_id
+     JOIN repositories r ON r.id = p.repository_id
+     JOIN organizations o ON o.id = r.organization_id
+     WHERE q.active = true AND p.state = 'open' AND p.draft = false AND r.enabled = true`,
+  );
+  return result.rows.map((row) => ({
+    pullRequestId: Number(row.pull_request_id),
+    repositoryId: Number(row.repository_id),
+    organizationId: Number(row.organization_id),
+    number: row.number,
+    repository: row.repository,
+    organizationLogin: row.organization_login,
+  }));
+}
+
 export async function getInstallationIdForOrganization(
   client: pg.PoolClient,
   organizationLogin: string,
