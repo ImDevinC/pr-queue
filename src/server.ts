@@ -5,10 +5,19 @@ import fastifyStatic from "@fastify/static";
 import { loadConfig } from "./config.js";
 import { createPool } from "./db/client.js";
 import { migrateDatabase } from "./db/migrate.js";
-import { applyConfiguration, getQueue } from "./db/storage.js";
+import {
+  applyConfiguration,
+  deactivateQueueEntry,
+  getActiveQueuedPullRequests,
+  getInstallationIdForOrganization,
+  getQueue,
+  upsertPullRequest,
+} from "./db/storage.js";
 import { loadEnvironment } from "./env.js";
 import { createGithubApi } from "./github/api.js";
 import { createWebhookProcessor } from "./github/processor.js";
+import { createSlackApi, verifySlackSignature } from "./slack/api.js";
+import { createSlackProcessor } from "./slack/processor.js";
 
 const environment = loadEnvironment();
 const config = await loadConfig(environment.CONFIG_PATH);
@@ -21,7 +30,16 @@ const github = createGithubApi({
   apiUrl: environment.GITHUB_API_URL,
 });
 const processor = createWebhookProcessor({ pool, config, github });
+const slack = createSlackApi(environment.SLACK_BOT_TOKEN);
 const app = Fastify({ logger: true });
+const slackProcessor = createSlackProcessor({
+  pool,
+  config,
+  github,
+  slack,
+  reactions: config.slack_reactions,
+  logger: app.log,
+});
 
 app.addContentTypeParser(
   "application/json",
@@ -72,6 +90,72 @@ app.post("/github/webhook", async (request, reply) => {
   return reply.code(202).send({ accepted: true });
 });
 
+app.post("/slack/events", async (request, reply) => {
+  const rawBody = Buffer.isBuffer(request.body)
+    ? request.body
+       : Buffer.from(JSON.stringify(request.body ?? {}));
+  const timestamp = request.headers["x-slack-request-timestamp"];
+  const signature = request.headers["x-slack-signature"];
+
+  if (
+    typeof timestamp !== "string" ||
+    typeof signature !== "string" ||
+    !verifySlackSignature(rawBody, timestamp, signature, environment.SLACK_SIGNING_SECRET)
+  ) {
+    return reply.code(401).send({ error: "Invalid Slack signature" });
+  }
+
+  // Reject old requests (> 5 minutes) to prevent replay attacks
+  const now = Math.floor(Date.now() / 1000);
+  const ts = Number.parseInt(timestamp, 10);
+  if (Number.isNaN(ts) || now - ts > 300) {
+    return reply.code(403).send({ error: "Request too old" });
+  }
+
+  let payload: Record<string, unknown>;
+  try {
+    payload = JSON.parse(rawBody.toString("utf8")) as Record<string, unknown>;
+  } catch {
+    return reply.code(400).send({ error: "Invalid JSON payload" });
+  }
+
+  // Handle URL verification challenge from Slack
+  if (payload.type === "url_verification" && typeof payload.challenge === "string") {
+    return reply.code(200).send({ challenge: payload.challenge });
+  }
+
+  // Only process event callbacks
+  if (payload.type !== "event_callback") {
+    return reply.code(200).send({ ok: true });
+  }
+
+  const event = payload.event as Record<string, unknown> | undefined;
+  if (!event || event.type !== "message") {
+    return reply.code(200).send({ ok: true });
+  }
+
+  // Skip bot messages, edited messages, thread broadcasts, etc.
+  const subtype = typeof event.subtype === "string" ? event.subtype : undefined;
+  if (subtype && subtype !== "") {
+    return reply.code(200).send({ ok: true });
+  }
+
+  const channelId = typeof event.channel === "string" ? event.channel : undefined;
+  const eventTs = typeof event.ts === "string" ? event.ts : undefined;
+  const text = typeof event.text === "string" ? event.text : "";
+
+  if (channelId && eventTs) {
+    await pool.query(
+      `INSERT INTO slack_events (slack_event_id, channel_id, payload)
+       VALUES ($1, $2, $3)
+       ON CONFLICT (slack_event_id) DO NOTHING`,
+      [`${channelId}:${eventTs}`, channelId, event],
+    );
+  }
+
+  return reply.code(200).send({ ok: true });
+});
+
 app.get("/api/queue", async () => ({
   updatedAt: new Date().toISOString(),
   entries: await getQueue(pool),
@@ -85,15 +169,110 @@ if (process.env.NODE_ENV !== "development") {
   app.get("/*", async (_request, reply) => reply.sendFile("index.html"));
 }
 
+async function syncQueuedPullRequests(): Promise<void> {
+  const queued = await getActiveQueuedPullRequests(pool);
+  if (queued.length === 0) return;
+
+  const byOrg = new Map<string, typeof queued>();
+  for (const pr of queued) {
+    const list = byOrg.get(pr.organizationLogin) ?? [];
+    list.push(pr);
+    byOrg.set(pr.organizationLogin, list);
+  }
+
+  for (const [orgLogin, prs] of byOrg) {
+    const client = await pool.connect();
+    let installationId: number | null = null;
+    try {
+      await client.query("BEGIN");
+      installationId = await getInstallationIdForOrganization(client, orgLogin);
+      await client.query("COMMIT");
+    } catch (e) {
+      await client.query("ROLLBACK");
+      throw e;
+    } finally {
+      client.release();
+    }
+
+    if (!installationId) {
+      app.log.warn(
+        `No active GitHub installation for ${orgLogin}, skipping PR state sync`,
+      );
+      continue;
+    }
+
+    for (const pr of prs) {
+      try {
+        const current = await github.getPullRequest(
+          pr.repository,
+          pr.number,
+          installationId,
+        );
+        const updateClient = await pool.connect();
+        try {
+          await updateClient.query("BEGIN");
+          const pullRequestId = await upsertPullRequest(
+            updateClient,
+            pr.repositoryId,
+            current,
+          );
+          if (current.state === "closed" || current.merged || current.draft) {
+            await deactivateQueueEntry(updateClient, pullRequestId);
+          }
+          await updateClient.query("COMMIT");
+        } catch (e) {
+          await updateClient.query("ROLLBACK");
+          throw e;
+        } finally {
+          updateClient.release();
+        }
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : String(error);
+        if (message.includes("404")) {
+          app.log.info(
+            { repo: pr.repository, number: pr.number },
+            "PR not found on GitHub, marking as closed",
+          );
+          const closeClient = await pool.connect();
+          try {
+            await closeClient.query("BEGIN");
+            await closeClient.query(
+              `UPDATE pull_requests SET state = 'closed', updated_at = now() WHERE id = $1`,
+              [pr.pullRequestId],
+            );
+            await deactivateQueueEntry(closeClient, pr.pullRequestId);
+            await closeClient.query("COMMIT");
+          } catch (e) {
+            await closeClient.query("ROLLBACK");
+            throw e;
+          } finally {
+            closeClient.release();
+          }
+        } else {
+          app.log.error(
+            { error: message, repo: pr.repository, number: pr.number },
+            "Failed to sync PR state on startup",
+          );
+        }
+      }
+    }
+  }
+}
+
+await syncQueuedPullRequests();
+
 const server = await app.listen({
   port: environment.PORT,
   host: environment.HOST,
 });
 const worker = processor.start();
+const slackWorker = slackProcessor.start();
 app.log.info(`PR Queue listening at ${server}`);
 
 async function shutdown(): Promise<void> {
   clearInterval(worker);
+  clearInterval(slackWorker);
   await app.close();
   await pool.end();
 }

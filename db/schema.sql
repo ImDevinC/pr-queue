@@ -113,3 +113,18 @@ CREATE TABLE IF NOT EXISTS webhook_deliveries (
 
 CREATE INDEX IF NOT EXISTS webhook_deliveries_pending_idx
   ON webhook_deliveries (status, received_at);
+
+CREATE TABLE IF NOT EXISTS slack_events (
+  id BIGSERIAL PRIMARY KEY,
+  slack_event_id TEXT NOT NULL UNIQUE,
+  channel_id TEXT NOT NULL,
+  payload JSONB NOT NULL,
+  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'processing', 'processed', 'failed')),
+  attempts INTEGER NOT NULL DEFAULT 0,
+  error TEXT,
+  received_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  processed_at TIMESTAMPTZ
+);
+
+CREATE INDEX IF NOT EXISTS slack_events_pending_idx
+  ON slack_events (status, received_at);

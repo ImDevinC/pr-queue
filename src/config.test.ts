@@ -43,12 +43,42 @@ describe("loadConfig", () => {
 
   it("loads config with missing repositories option", async () => {
     await withTempYaml(
-      `organization: acme\nignored_authors:\n  - bot`,
+      `organization: acme`,
       async (path) => {
         const config = await loadConfig(path);
         expect(config.organization).toBe("acme");
         expect(config.repositories).toEqual([]);
         expect(config.repositorySet).toEqual(new Set());
+      },
+    );
+  });
+
+  it("loads slack channels and reactions", async () => {
+    await withTempYaml(
+      `organization: acme\nslack_channels:\n  - general\n  - dev\nslack_reactions:\n  success: ":rocket:"\n  failure: ":boom:"`,
+      async (path) => {
+        const config = await loadConfig(path);
+        expect(config.slack_channels).toEqual(["general", "dev"]);
+        expect(config.slackChannelSet).toEqual(
+          new Set(["general", "dev"]),
+        );
+        expect(config.slack_reactions).toEqual({
+          success: ":rocket:",
+          failure: ":boom:",
+        });
+      },
+    );
+  });
+
+  it("uses default slack reactions when not specified", async () => {
+    await withTempYaml(
+      `organization: acme`,
+      async (path) => {
+        const config = await loadConfig(path);
+        expect(config.slack_reactions).toEqual({
+          success: ":white_check_mark:",
+          failure: ":x:",
+        });
       },
     );
   });

@@ -47,7 +47,6 @@ export function applyQueueEvent(
       state.active &&
       Boolean(event.headSha) &&
       event.headSha !== state.headSha &&
-      event.hasSubmittedReview === true &&
       event.headSha !== state.lastRequeuedSha;
 
     return {

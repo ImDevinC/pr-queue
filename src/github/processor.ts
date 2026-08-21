@@ -111,9 +111,6 @@ export function createWebhookProcessor(options: {
     payload: GithubPullRequestPayload,
   ): Promise<void> {
     const pullRequest = payload.pull_request;
-    const ignored = config.ignoredAuthorSet.has(
-      pullRequest.user.login.toLowerCase(),
-    );
     const ready = shouldActivatePullRequest(payload.action, pullRequest.draft);
 
     const pullRequestId = await withTransaction(async (client) => {
@@ -131,7 +128,6 @@ export function createWebhookProcessor(options: {
       );
 
       if (
-        ignored ||
         payload.action === "closed" ||
         pullRequest.merged ||
         payload.action === "converted_to_draft" ||
@@ -145,17 +141,14 @@ export function createWebhookProcessor(options: {
       } else if (payload.action === "synchronize") {
         const queue = await client.query<{
           active: boolean;
-          last_reviewed_sha: string | null;
           last_requeued_sha: string | null;
         }>(
-          `SELECT active, last_reviewed_sha, last_requeued_sha FROM queue_entries WHERE pull_request_id = $1 FOR UPDATE`,
+          `SELECT active, last_requeued_sha FROM queue_entries WHERE pull_request_id = $1 FOR UPDATE`,
           [id],
         );
         const current = queue.rows[0];
         if (
           current?.active &&
-          current.last_reviewed_sha &&
-          current.last_reviewed_sha !== pullRequest.head.sha &&
           current.last_requeued_sha !== pullRequest.head.sha
         ) {
           await requeueEntry(

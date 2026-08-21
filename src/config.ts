@@ -6,12 +6,18 @@ import { z } from "zod";
 const configSchema = z.object({
   organization: z.string().min(1),
   repositories: z.array(z.string().regex(/^[^/]+\/[^/]+$/)).default([]),
-  ignored_authors: z.array(z.string().min(1)).default([]),
+  slack_channels: z.array(z.string().min(1)).default([]),
+  slack_reactions: z
+    .object({
+      success: z.string().min(1).default(":white_check_mark:"),
+      failure: z.string().min(1).default(":x:"),
+    })
+    .default({}),
 });
 
 export type QueueConfig = z.infer<typeof configSchema> & {
   repositorySet: Set<string>;
-  ignoredAuthorSet: Set<string>;
+  slackChannelSet: Set<string>;
 };
 
 export async function loadConfig(path: string): Promise<QueueConfig> {
@@ -20,8 +26,8 @@ export async function loadConfig(path: string): Promise<QueueConfig> {
   const repositorySet = new Set(
     parsed.repositories.map((repository) => repository.toLowerCase()),
   );
-  const ignoredAuthorSet = new Set(
-    parsed.ignored_authors.map((author) => author.toLowerCase()),
+  const slackChannelSet = new Set(
+    parsed.slack_channels.map((channel) => channel.toLowerCase()),
   );
 
   if (repositorySet.size !== parsed.repositories.length) {
@@ -40,5 +46,5 @@ export async function loadConfig(path: string): Promise<QueueConfig> {
     );
   }
 
-  return { ...parsed, repositorySet, ignoredAuthorSet };
+  return { ...parsed, repositorySet, slackChannelSet };
 }
