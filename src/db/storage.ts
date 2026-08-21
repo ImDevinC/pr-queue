@@ -20,6 +20,7 @@ export interface QueueRow {
   url: string;
   author: { login: string; avatarUrl: string | null };
   waitingSince: string;
+  updatedAt: string;
   headSha: string;
   reviewState: ReviewState;
   statuses: {
@@ -379,6 +380,7 @@ export async function getQueue(
     author_login: string;
     author_avatar_url: string | null;
     ready_at: string;
+    updated_at: string;
     head_sha: string;
     review_state: ReviewState;
     check_status: ReturnType<typeof aggregateStatuses>;
@@ -391,7 +393,7 @@ export async function getQueue(
        ROW_NUMBER() OVER (ORDER BY q.queue_order) AS position,
        ROW_NUMBER() OVER (ORDER BY q.queue_order) - 1 AS ahead,
        r.full_name AS repository, p.number, p.title, p.url, p.author_login, p.author_avatar_url,
-       p.ready_at, p.head_sha, p.review_state, p.check_status, p.workflow_status, p.commit_status,
+        p.ready_at, p.updated_at, p.head_sha, p.review_state, p.check_status, p.workflow_status, p.commit_status,
        p.requested_reviewers, p.required_reviewers
      FROM queue_entries q
      JOIN pull_requests p ON p.id = q.pull_request_id
@@ -408,6 +410,7 @@ export async function getQueue(
     url: row.url,
     author: { login: row.author_login, avatarUrl: row.author_avatar_url },
     waitingSince: row.ready_at,
+    updatedAt: row.updated_at,
     headSha: row.head_sha,
     reviewState: row.review_state,
     statuses: {

@@ -43,6 +43,7 @@ interface QueueEntry {
   url: string;
   author: { login: string; avatarUrl: string | null };
   waitingSince: string;
+  updatedAt: string;
   reviewState: ReviewState;
   statuses: { checks: Status; workflows: Status; commits: Status };
   requestedReviewers: Array<{ login: string; type: string }>;
@@ -345,6 +346,9 @@ function PullRequestCard({ entry }: { entry: QueueEntry }) {
             </Stack>
             <Typography variant="body2" color="text.secondary">
               Waiting {formatWaiting(entry.waitingSince)}
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              Updated {formatWaiting(entry.updatedAt)}
             </Typography>
           </Stack>
 
