@@ -5,7 +5,14 @@ import fastifyStatic from "@fastify/static";
 import { loadConfig } from "./config.js";
 import { createPool } from "./db/client.js";
 import { migrateDatabase } from "./db/migrate.js";
-import { applyConfiguration, getQueue } from "./db/storage.js";
+import {
+  applyConfiguration,
+  deactivateQueueEntry,
+  getActiveQueuedPullRequests,
+  getInstallationIdForOrganization,
+  getQueue,
+  upsertPullRequest,
+} from "./db/storage.js";
 import { loadEnvironment } from "./env.js";
 import { createGithubApi } from "./github/api.js";
 import { createWebhookProcessor } from "./github/processor.js";
@@ -161,6 +168,99 @@ if (process.env.NODE_ENV !== "development") {
   });
   app.get("/*", async (_request, reply) => reply.sendFile("index.html"));
 }
+
+async function syncQueuedPullRequests(): Promise<void> {
+  const queued = await getActiveQueuedPullRequests(pool);
+  if (queued.length === 0) return;
+
+  const byOrg = new Map<string, typeof queued>();
+  for (const pr of queued) {
+    const list = byOrg.get(pr.organizationLogin) ?? [];
+    list.push(pr);
+    byOrg.set(pr.organizationLogin, list);
+  }
+
+  for (const [orgLogin, prs] of byOrg) {
+    const client = await pool.connect();
+    let installationId: number | null = null;
+    try {
+      await client.query("BEGIN");
+      installationId = await getInstallationIdForOrganization(client, orgLogin);
+      await client.query("COMMIT");
+    } catch (e) {
+      await client.query("ROLLBACK");
+      throw e;
+    } finally {
+      client.release();
+    }
+
+    if (!installationId) {
+      app.log.warn(
+        `No active GitHub installation for ${orgLogin}, skipping PR state sync`,
+      );
+      continue;
+    }
+
+    for (const pr of prs) {
+      try {
+        const current = await github.getPullRequest(
+          pr.repository,
+          pr.number,
+          installationId,
+        );
+        const updateClient = await pool.connect();
+        try {
+          await updateClient.query("BEGIN");
+          const pullRequestId = await upsertPullRequest(
+            updateClient,
+            pr.repositoryId,
+            current,
+          );
+          if (current.state === "closed" || current.merged || current.draft) {
+            await deactivateQueueEntry(updateClient, pullRequestId);
+          }
+          await updateClient.query("COMMIT");
+        } catch (e) {
+          await updateClient.query("ROLLBACK");
+          throw e;
+        } finally {
+          updateClient.release();
+        }
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : String(error);
+        if (message.includes("404")) {
+          app.log.info(
+            { repo: pr.repository, number: pr.number },
+            "PR not found on GitHub, marking as closed",
+          );
+          const closeClient = await pool.connect();
+          try {
+            await closeClient.query("BEGIN");
+            await closeClient.query(
+              `UPDATE pull_requests SET state = 'closed', updated_at = now() WHERE id = $1`,
+              [pr.pullRequestId],
+            );
+            await deactivateQueueEntry(closeClient, pr.pullRequestId);
+            await closeClient.query("COMMIT");
+          } catch (e) {
+            await closeClient.query("ROLLBACK");
+            throw e;
+          } finally {
+            closeClient.release();
+          }
+        } else {
+          app.log.error(
+            { error: message, repo: pr.repository, number: pr.number },
+            "Failed to sync PR state on startup",
+          );
+        }
+      }
+    }
+  }
+}
+
+await syncQueuedPullRequests();
 
 const server = await app.listen({
   port: environment.PORT,
