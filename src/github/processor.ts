@@ -238,7 +238,7 @@ export function createWebhookProcessor(options: {
       payload.workflow_run.head_sha,
       "workflow",
       String(payload.workflow_run.id),
-      "GitHub Actions",
+      payload.workflow_run.name,
       payload.workflow_run.status,
       payload.workflow_run.conclusion,
       payload.installation?.id,

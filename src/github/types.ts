@@ -82,6 +82,7 @@ export interface GithubWorkflowRunPayload {
   action: string;
   workflow_run: {
     id: number;
+    name: string;
     status: string;
     conclusion: string | null;
     head_sha: string;
