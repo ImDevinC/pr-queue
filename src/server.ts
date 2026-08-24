@@ -16,6 +16,7 @@ import {
 import { loadEnvironment } from "./env.js";
 import { createGithubApi } from "./github/api.js";
 import { createWebhookProcessor } from "./github/processor.js";
+import { createStatusPoller } from "./github/poller.js";
 import { createSlackApi, verifySlackSignature } from "./slack/api.js";
 import { createSlackProcessor } from "./slack/processor.js";
 
@@ -40,6 +41,7 @@ const slackProcessor = createSlackProcessor({
   reactions: config.slack_reactions,
   logger: app.log,
 });
+const statusPoller = createStatusPoller({ pool, github, logger: app.log });
 
 app.addContentTypeParser(
   "application/json",
@@ -298,12 +300,14 @@ const server = await app.listen({
 });
 const worker = processor.start();
 const slackWorker = slackProcessor.start();
+const statusWorker = statusPoller.start();
 app.log.info(`PR Queue listening at ${server}`);
 
 async function shutdown(): Promise<void> {
   clearInterval(syncInterval);
   clearInterval(worker);
   clearInterval(slackWorker);
+  statusPoller.stop();
   await app.close();
   await pool.end();
 }
