@@ -93,14 +93,19 @@ app.post("/github/webhook", async (request, reply) => {
 app.post("/slack/events", async (request, reply) => {
   const rawBody = Buffer.isBuffer(request.body)
     ? request.body
-       : Buffer.from(JSON.stringify(request.body ?? {}));
+    : Buffer.from(JSON.stringify(request.body ?? {}));
   const timestamp = request.headers["x-slack-request-timestamp"];
   const signature = request.headers["x-slack-signature"];
 
   if (
     typeof timestamp !== "string" ||
     typeof signature !== "string" ||
-    !verifySlackSignature(rawBody, timestamp, signature, environment.SLACK_SIGNING_SECRET)
+    !verifySlackSignature(
+      rawBody,
+      timestamp,
+      signature,
+      environment.SLACK_SIGNING_SECRET,
+    )
   ) {
     return reply.code(401).send({ error: "Invalid Slack signature" });
   }
@@ -120,7 +125,10 @@ app.post("/slack/events", async (request, reply) => {
   }
 
   // Handle URL verification challenge from Slack
-  if (payload.type === "url_verification" && typeof payload.challenge === "string") {
+  if (
+    payload.type === "url_verification" &&
+    typeof payload.challenge === "string"
+  ) {
     return reply.code(200).send({ challenge: payload.challenge });
   }
 
@@ -140,7 +148,8 @@ app.post("/slack/events", async (request, reply) => {
     return reply.code(200).send({ ok: true });
   }
 
-  const channelId = typeof event.channel === "string" ? event.channel : undefined;
+  const channelId =
+    typeof event.channel === "string" ? event.channel : undefined;
   const eventTs = typeof event.ts === "string" ? event.ts : undefined;
   const text = typeof event.text === "string" ? event.text : "";
 
@@ -169,98 +178,119 @@ if (process.env.NODE_ENV !== "development") {
   app.get("/*", async (_request, reply) => reply.sendFile("index.html"));
 }
 
+let isSyncing = false;
+
 async function syncQueuedPullRequests(): Promise<void> {
-  const queued = await getActiveQueuedPullRequests(pool);
-  if (queued.length === 0) return;
-
-  const byOrg = new Map<string, typeof queued>();
-  for (const pr of queued) {
-    const list = byOrg.get(pr.organizationLogin) ?? [];
-    list.push(pr);
-    byOrg.set(pr.organizationLogin, list);
+  if (isSyncing) {
+    app.log.info("Skipping PR sync because a previous sync is still running");
+    return;
   }
+  isSyncing = true;
+  try {
+    const queued = await getActiveQueuedPullRequests(pool);
+    if (queued.length === 0) return;
 
-  for (const [orgLogin, prs] of byOrg) {
-    const client = await pool.connect();
-    let installationId: number | null = null;
-    try {
-      await client.query("BEGIN");
-      installationId = await getInstallationIdForOrganization(client, orgLogin);
-      await client.query("COMMIT");
-    } catch (e) {
-      await client.query("ROLLBACK");
-      throw e;
-    } finally {
-      client.release();
+    const byOrg = new Map<string, typeof queued>();
+    for (const pr of queued) {
+      const list = byOrg.get(pr.organizationLogin) ?? [];
+      list.push(pr);
+      byOrg.set(pr.organizationLogin, list);
     }
 
-    if (!installationId) {
-      app.log.warn(
-        `No active GitHub installation for ${orgLogin}, skipping PR state sync`,
-      );
-      continue;
-    }
-
-    for (const pr of prs) {
+    for (const [orgLogin, prs] of byOrg) {
+      const client = await pool.connect();
+      let installationId: number | null = null;
       try {
-        const current = await github.getPullRequest(
-          pr.repository,
-          pr.number,
-          installationId,
+        await client.query("BEGIN");
+        installationId = await getInstallationIdForOrganization(
+          client,
+          orgLogin,
         );
-        const updateClient = await pool.connect();
+        await client.query("COMMIT");
+      } catch (e) {
+        await client.query("ROLLBACK");
+        throw e;
+      } finally {
+        client.release();
+      }
+
+      if (!installationId) {
+        app.log.warn(
+          `No active GitHub installation for ${orgLogin}, skipping PR state sync`,
+        );
+        continue;
+      }
+
+      for (const pr of prs) {
         try {
-          await updateClient.query("BEGIN");
-          const pullRequestId = await upsertPullRequest(
-            updateClient,
-            pr.repositoryId,
-            current,
+          const current = await github.getPullRequest(
+            pr.repository,
+            pr.number,
+            installationId,
           );
-          if (current.state === "closed" || current.merged || current.draft) {
-            await deactivateQueueEntry(updateClient, pullRequestId);
-          }
-          await updateClient.query("COMMIT");
-        } catch (e) {
-          await updateClient.query("ROLLBACK");
-          throw e;
-        } finally {
-          updateClient.release();
-        }
-      } catch (error) {
-        const message =
-          error instanceof Error ? error.message : String(error);
-        if (message.includes("404")) {
-          app.log.info(
-            { repo: pr.repository, number: pr.number },
-            "PR not found on GitHub, marking as closed",
-          );
-          const closeClient = await pool.connect();
+          const updateClient = await pool.connect();
           try {
-            await closeClient.query("BEGIN");
-            await closeClient.query(
-              `UPDATE pull_requests SET state = 'closed', updated_at = now() WHERE id = $1`,
-              [pr.pullRequestId],
+            await updateClient.query("BEGIN");
+            const pullRequestId = await upsertPullRequest(
+              updateClient,
+              pr.repositoryId,
+              current,
             );
-            await deactivateQueueEntry(closeClient, pr.pullRequestId);
-            await closeClient.query("COMMIT");
+            if (current.state === "closed" || current.merged || current.draft) {
+              await deactivateQueueEntry(updateClient, pullRequestId);
+            }
+            await updateClient.query("COMMIT");
           } catch (e) {
-            await closeClient.query("ROLLBACK");
+            await updateClient.query("ROLLBACK");
             throw e;
           } finally {
-            closeClient.release();
+            updateClient.release();
           }
-        } else {
-          app.log.error(
-            { error: message, repo: pr.repository, number: pr.number },
-            "Failed to sync PR state on startup",
-          );
+        } catch (error) {
+          const message =
+            error instanceof Error ? error.message : String(error);
+          if (message.includes("404")) {
+            app.log.info(
+              { repo: pr.repository, number: pr.number },
+              "PR not found on GitHub, marking as closed",
+            );
+            const closeClient = await pool.connect();
+            try {
+              await closeClient.query("BEGIN");
+              await closeClient.query(
+                `UPDATE pull_requests SET state = 'closed', updated_at = now() WHERE id = $1`,
+                [pr.pullRequestId],
+              );
+              await deactivateQueueEntry(closeClient, pr.pullRequestId);
+              await closeClient.query("COMMIT");
+            } catch (e) {
+              await closeClient.query("ROLLBACK");
+              throw e;
+            } finally {
+              closeClient.release();
+            }
+          } else {
+            app.log.error(
+              { error: message, repo: pr.repository, number: pr.number },
+              "Failed to sync PR state",
+            );
+          }
         }
       }
     }
+  } finally {
+    isSyncing = false;
   }
 }
 
 await syncQueuedPullRequests();
+
+const syncInterval = setInterval(() => {
+  syncQueuedPullRequests().catch((error: unknown) => {
+    const message = error instanceof Error ? error.message : String(error);
+    app.log.error({ error: message }, "Periodic PR sync failed");
+  });
+}, environment.PR_SYNC_INTERVAL_MS);
 
 const server = await app.listen({
   port: environment.PORT,
@@ -271,6 +301,7 @@ const slackWorker = slackProcessor.start();
 app.log.info(`PR Queue listening at ${server}`);
 
 async function shutdown(): Promise<void> {
+  clearInterval(syncInterval);
   clearInterval(worker);
   clearInterval(slackWorker);
   await app.close();
