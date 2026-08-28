@@ -236,7 +236,7 @@ export function App() {
                   label="Filter by repository"
                   value={filter}
                   onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFilter(e.target.value)}
-                  placeholder="e.g. terra or ImDevinC/*"
+                  placeholder="eg. myrepo or MyOrg/*"
                   aria-describedby="repo-filter-hint"
                   fullWidth
                 />
